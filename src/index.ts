@@ -1,12 +1,15 @@
 import express, { Request, Response } from "express";
 import fetch from "node-fetch";
 import NodeCache from "node-cache";
+import axios, { AxiosResponse } from "axios";
+import { get } from "http";
 
+let FuturePairs: string[] = [];
 const app = express();
 const PORT = 3000;
 
 // Cache setup with 30-second TTL
-const cache = new NodeCache({ stdTTL: 30 });
+const cache = new NodeCache({ stdTTL: 50 });
 
 // External API URLs
 const apiUrls: Record<string, string> = {
@@ -15,20 +18,10 @@ const apiUrls: Record<string, string> = {
 };
 
 // Function to fetch all APIs
-const fetchAllAPIs = async (): Promise<Record<string, unknown>> => {
-  const entries = await Promise.all(
-    Object.entries(apiUrls).map(async ([key, url]) => {
-      try {
-        const res = await fetch(url);
-        const data = await res.json();
-        return [key, data];
-      } catch (err) {
-        return [key, { error: (err as Error).message }];
-      }
-    })
-  );
+const fetchAllAPIs = async () => {
+  const entries = await getAllTimeKline();
 
-  return Object.fromEntries(entries);
+  return entries;
 };
 
 // REST endpoint
@@ -39,13 +32,65 @@ app.get("/data", async (req: Request, res: Response) => {
     console.log("Fetching fresh data...");
     data = await fetchAllAPIs();
     cache.set("combined_data", data);
+    3;
+    res.json("fetched latest data");
   } else {
     console.log("Using cached data...");
+    res.json("using cached data");
   }
-
-  res.json(data);
+  //res.json("fetched data");
+  //res.json(data);
 });
 
 app.listen(PORT, () => {
   console.log(`Server is running at http://localhost:${PORT}`);
 });
+
+async function getKlineData(time: string) {
+  let promisarray: any[] = [];
+  await axios
+    .get(
+      "https://raw.githubusercontent.com/harshal98/Pairs/main/FuturePairs.js"
+    )
+    .then((res) => (FuturePairs = res.data));
+
+  FuturePairs.forEach((item) => {
+    promisarray.push(
+      axios.get(
+        `https://api.binance.com/api/v3/klines?interval=${time}&limit=200&symbol=${item}`
+      )
+    );
+  });
+  let res = await axios.all(promisarray);
+  let temp: {
+    pair: string;
+    kline: { c: number; l: number; h: number; o: number }[];
+  }[] = [];
+  res.forEach((r: AxiosResponse) => {
+    let pairUrl = String(r.request.responseURL);
+    pairUrl = pairUrl.substring(pairUrl.lastIndexOf("=") + 1);
+    let hc: { c: number; l: number; h: number; o: number }[] = [];
+
+    r.data.forEach((i: any[]) =>
+      hc.push({
+        c: Number(i[4]),
+        h: Number(i[2]),
+        l: Number(i[3]),
+        o: Number(i[1]),
+      })
+    );
+    temp.push({ pair: pairUrl, kline: hc });
+  });
+
+  return temp;
+}
+
+async function getAllTimeKline() {
+  let m5m = await getKlineData("5m");
+  // let m15m = await getKlineData("15m");
+  // let h1 = await getKlineData("1h");
+  // let h4 = await getKlineData("4h");
+  // let d1 = await getKlineData("1d");
+
+  return { m5m }; //, m15m, h1, h4, d1 };
+}
