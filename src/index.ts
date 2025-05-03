@@ -33,12 +33,12 @@ app.get("/data", async (req: Request, res: Response) => {
     data = await fetchAllAPIs();
     cache.set("combined_data", data);
     3;
-    res.json("fetched latest data");
+    // res.json("fetched latest data");
   } else {
     console.log("Using cached data...");
-    res.json("using cached data");
+    //res.json("using cached data");
   }
-  //res.json("fetched data");
+  res.json(data);
   //res.json(data);
 });
 
