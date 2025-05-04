@@ -3,13 +3,13 @@ import fetch from "node-fetch";
 import NodeCache from "node-cache";
 import axios, { AxiosResponse } from "axios";
 import { get } from "http";
-
+import cors from "cors";
 let FuturePairs: string[] = [];
 const app = express();
 const PORT = 3000;
-
+app.use(cors()); // Enable CORS for all origins
 // Cache setup with 30-second TTL
-const cache = new NodeCache({ stdTTL: 50 });
+const cache = new NodeCache({ stdTTL: 20 });
 
 // External API URLs
 const apiUrls: Record<string, string> = {
@@ -18,20 +18,21 @@ const apiUrls: Record<string, string> = {
 };
 
 // Function to fetch all APIs
-const fetchAllAPIs = async () => {
-  const entries = await getAllTimeKline();
+const fetchAllAPIs = async (time: string) => {
+  const entries = await getKlineData(time);
 
   return entries;
 };
 
 // REST endpoint
 app.get("/data", async (req: Request, res: Response) => {
-  let data = cache.get<Record<string, unknown>>("combined_data");
+  const time = req.query.time as string; // Cast to string
+  let data = cache.get(time);
 
   if (!data) {
     console.log("Fetching fresh data...");
-    data = await fetchAllAPIs();
-    cache.set("combined_data", data);
+    data = await fetchAllAPIs(time);
+    cache.set(time, data);
     3;
     // res.json("fetched latest data");
   } else {
@@ -47,7 +48,8 @@ app.listen(PORT, () => {
 });
 
 async function getKlineData(time: string) {
-  let promisarray: any[] = [];
+  let promisarray: Promise<AxiosResponse<any>>[] = [];
+  let FuturePairs: string[] = [];
   await axios
     .get(
       "https://raw.githubusercontent.com/harshal98/Pairs/main/FuturePairs.js"
@@ -57,7 +59,8 @@ async function getKlineData(time: string) {
   FuturePairs.forEach((item) => {
     promisarray.push(
       axios.get(
-        `https://api.binance.com/api/v3/klines?interval=${time}&limit=200&symbol=${item}`
+        `https://api.binance.com/api/v3/klines?interval=${time}&limit=200&symbol=${item}`,
+        { headers: { pair: item } }
       )
     );
   });
@@ -67,11 +70,10 @@ async function getKlineData(time: string) {
     kline: { c: number; l: number; h: number; o: number }[];
   }[] = [];
   res.forEach((r: AxiosResponse) => {
-    let pairUrl = String(r.request.responseURL);
-    pairUrl = pairUrl.substring(pairUrl.lastIndexOf("=") + 1);
+    let pairUrl = r.config.headers.pair as string;
     let hc: { c: number; l: number; h: number; o: number }[] = [];
 
-    r.data.forEach((i: any[]) =>
+    r.data.forEach((i: [number, string, string, string, string, ...any[]]) =>
       hc.push({
         c: Number(i[4]),
         h: Number(i[2]),
@@ -87,10 +89,10 @@ async function getKlineData(time: string) {
 
 async function getAllTimeKline() {
   let m5m = await getKlineData("5m");
-  // let m15m = await getKlineData("15m");
-  // let h1 = await getKlineData("1h");
-  // let h4 = await getKlineData("4h");
-  // let d1 = await getKlineData("1d");
+  let m15m = await getKlineData("15m");
+  let h1 = await getKlineData("1h");
+  let h4 = await getKlineData("4h");
+  let d1 = await getKlineData("1d");
 
-  return { m5m }; //, m15m, h1, h4, d1 };
+  return { m5m, m15m, h1, h4, d1 };
 }
