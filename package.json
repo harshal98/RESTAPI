@@ -2,11 +2,10 @@
   "name": "restapi",
   "version": "1.0.0",
   "main": "index.js",
- "scripts": {
-  "start": "node index.js",
+"scripts": {
+  "start": "node dist/index.js",
   "build": "node build.js"
-}
-,
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
