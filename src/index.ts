@@ -6,7 +6,7 @@ import { get } from "http";
 import cors from "cors";
 let FuturePairs: string[] = [];
 const app = express();
-const PORT = 3000;
+const PORT = 8080;
 app.use(cors()); // Enable CORS for all origins
 // Cache setup with 30-second TTL
 const cache = new NodeCache({ stdTTL: 20 });
